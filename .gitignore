@@ -1,0 +1,16 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.env*
+!.env.example
+__pycache__/
+.venv/
+supabase/.temp/
+.firebase-preview/
+.firebase/
+firebase-debug.log*
+/sources/ryokan-region-intake-*.json
+/sources/dormyinn-directory-review-*.json
+/sources/yufuin-lodging-review-*.json
+/docs/ryokan-region-intake-*.md

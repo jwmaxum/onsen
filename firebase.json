@@ -1,0 +1,21 @@
+{
+  "hosting": {
+    "site": "onsen-587dc",
+    "public": ".firebase-preview",
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "redirects": [
+      { "source": "/", "destination": "/ko/onsen", "type": 302 }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Robots-Tag", "value": "noindex, nofollow" },
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "Content-Security-Policy", "value": "default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'" }
+        ]
+      }
+    ]
+  }
+}

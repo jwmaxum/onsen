@@ -1,0 +1,68 @@
+import type { Locale } from './catalog-query';
+
+const strings = {
+  ko: {
+    title: '도도부현별 온천 조사 현황', intro: '확인된 기록부터 공개하고 있습니다. 후보·검수·공개 수는 현재 등록부의 건수이며 일본 전체 온천 수를 뜻하지 않습니다.',
+    directory: '온천 목록', facility: '시설', area: '온천지', prefecture: '도도부현', status: '조사 상태',
+    counts: '등록부 집계', sources: '자료원', candidates: '후보', reviewed: '검수', published: '공개', withdrawn: '철회',
+    gap: '미확인 항목과 조사일', unknown: '미확인', unresearched: '미조사', insufficient_data: '자료 부족',
+    review_pending: '검수 중', none_verified: '해당 시설 없음 확인', partial_publication: '표본 공개', published_state: '공개 가능',
+    inventory_pending: '전체 시설 목록 미확인', optional_fields_pending: '가격·사진·분석·교통 등 추가 검수 필요',
+    other_rights_pending: '추가 자료의 공개 조건 미확인', source_review_pending: '시설 자료원과 공개 조건 미조사',
+    area_review_pending: '온천지 단위 검수 대기', position_pending: '후보 시설의 좌표 또는 운영 상태 검수 대기',
+    officialAreas: '환경성 온천지 총계', designatedAreas: '국가지정 명부', discoveryRecords: '별도 자료 후보',
+    official_roster_unavailable: '환경성 총계와 대조할 명칭별 원장 미확보',
+    official_roster_partial: '명칭 원장 일부 등록', official_roster_reuse_pending: '명칭 원장 등록 · 웹 재이용 조건 확인 대기',
+    official_roster_reconciled: '명칭 원장 대조 완료', registeredOfficial: '원장 명칭 등록', officialRemaining: '원장 미확보 수',
+    benchmarkNote: '환경성 수치는 숙박시설이 있는 온천지의 기준일 집계입니다. 국가지정 명부와 별도 후보는 서로 겹칠 수 있습니다.',
+  },
+  ja: {
+    title: '都道府県別の温泉調査状況', intro: '確認済みの記録から公開しています。候補・確認・公開件数は現在の登録件数で、日本の温泉総数を示すものではありません。',
+    directory: '温泉一覧', facility: '施設', area: '温泉地', prefecture: '都道府県', status: '調査状況',
+    counts: '登録件数', sources: '情報源', candidates: '候補', reviewed: '確認済み', published: '公開', withdrawn: '取り下げ',
+    gap: '未確認項目と調査日', unknown: '未確認', unresearched: '未調査', insufficient_data: '資料不足',
+    review_pending: '確認中', none_verified: '該当施設なしを確認', partial_publication: '一部公開', published_state: '公開可能',
+    inventory_pending: '施設全体の一覧は未確認', optional_fields_pending: '料金・写真・分析・交通などの追加確認が必要',
+    other_rights_pending: '追加資料の公開条件は未確認', source_review_pending: '施設資料と公開条件は未調査',
+    area_review_pending: '温泉地単位の確認待ち', position_pending: '候補施設の位置または営業状況を確認中',
+    officialAreas: '環境省の温泉地数', designatedAreas: '国民保養温泉地', discoveryRecords: '別資料の候補',
+    official_roster_unavailable: '環境省の集計に対応する名称別原簿は未入手',
+    official_roster_partial: '名称別原簿を一部登録', official_roster_reuse_pending: '原簿登録済み・ウェブ再利用条件の確認待ち',
+    official_roster_reconciled: '名称別原簿の照合済み', registeredOfficial: '原簿の登録件数', officialRemaining: '原簿未入手分',
+    benchmarkNote: '環境省の数字は宿泊施設のある温泉地の集計です。指定一覧と別資料の候補には重複があり得ます。',
+  },
+  en: {
+    title: 'Hot spring coverage by prefecture', intro: 'Records appear as they are verified. Candidate, review and publication counts describe this register; Japan’s total is outside its scope.',
+    directory: 'Hot spring directory', facility: 'Facilities', area: 'Hot spring areas', prefecture: 'Prefecture', status: 'Survey status',
+    counts: 'Register counts', sources: 'Sources', candidates: 'Candidates', reviewed: 'Reviewed', published: 'Published', withdrawn: 'Withdrawn',
+    gap: 'Open items and survey date', unknown: 'Unverified', unresearched: 'Unresearched', insufficient_data: 'Insufficient data',
+    review_pending: 'Under review', none_verified: 'Confirmed no facilities', partial_publication: 'Sample published', published_state: 'Ready to publish',
+    inventory_pending: 'Full facility inventory pending', optional_fields_pending: 'Prices, photos, analyses and transport require further checks',
+    other_rights_pending: 'Publication rights for additional sources pending', source_review_pending: 'Facility sources and rights still to be surveyed',
+    area_review_pending: 'Area-level review pending', position_pending: 'Facility location or operating status pending',
+    officialAreas: 'Ministry benchmark', designatedAreas: 'National designations', discoveryRecords: 'Discovery records',
+    official_roster_unavailable: 'The name-level roster behind the Ministry benchmark is unavailable',
+    official_roster_partial: 'Part of the name-level roster is registered', official_roster_reuse_pending: 'Roster registered · web reuse conditions pending',
+    official_roster_reconciled: 'Name-level roster reconciled', registeredOfficial: 'Official names registered', officialRemaining: 'Names remaining',
+    benchmarkNote: 'The Ministry counts hot spring areas with lodging. The national designations and discovery records can overlap.',
+  },
+  'zh-Hans': {
+    title: '各都道府县温泉调查进度', intro: '已核查的记录陆续公开。候选、审核和公开数量仅反映当前登记情况。',
+    directory: '温泉目录', facility: '设施', area: '温泉区', prefecture: '都道府县', status: '调查状态',
+    counts: '登记统计', sources: '资料来源', candidates: '候选', reviewed: '已审核', published: '已公开', withdrawn: '已撤回',
+    gap: '待确认事项和调查日期', unknown: '未确认', unresearched: '未调查', insufficient_data: '资料不足',
+    review_pending: '审核中', none_verified: '已确认无相关设施', partial_publication: '部分公开', published_state: '可公开',
+    inventory_pending: '完整设施清单待确认', optional_fields_pending: '价格、照片、分析和交通等资料待核查',
+    other_rights_pending: '补充资料的公开条件待确认', source_review_pending: '设施资料和公开条件尚未调查',
+    area_review_pending: '温泉区资料待审核', position_pending: '设施位置或营业状态待确认',
+    officialAreas: '环境省温泉区统计', designatedAreas: '国家指定名录', discoveryRecords: '其他资料候选',
+    official_roster_unavailable: '尚未取得与环境省统计对应的逐项名录',
+    official_roster_partial: '已登记部分名录', official_roster_reuse_pending: '名录已登记 · 网页再利用条件待确认',
+    official_roster_reconciled: '逐项名录已核对', registeredOfficial: '已登记官方名称', officialRemaining: '待取得名称',
+    benchmarkNote: '环境省统计的是有住宿设施的温泉区。国家指定名录与其他候选资料可能重叠。',
+  },
+} satisfies Record<Locale, Record<string, string>>;
+
+export function coverageText(locale: Locale) {
+  return strings[locale];
+}
