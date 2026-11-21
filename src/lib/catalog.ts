@@ -45,7 +45,7 @@ async function read<T>(view: View, params: Record<string, string>): Promise<T[]>
     if (key.startsWith('eyJ')) headers.Authorization = `Bearer ${key}`;
   }
   try {
-    const response = await fetch(url, { headers, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(5000) });
+    const response = await fetch(url, { headers, cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw new CatalogError('data_unavailable', 503);
     const payload: unknown = await response.json();
     if (!Array.isArray(payload)) throw new CatalogError('data_unavailable', 503);
