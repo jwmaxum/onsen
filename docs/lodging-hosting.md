@@ -28,7 +28,7 @@ Cloudflare Worker는 `ONSEN_FIREBASE_DATABASE_URL`의 Realtime Database에서 `/
 
 검수 담당자가 원본 DB에서 릴리스를 활성화하면 Windows 발행 작업이 익명 PostgREST의 공개 뷰 여섯 개를 읽는다. 현황이나 분석이 바뀌면 같은 릴리스 ID에서도 반영한다. Firebase에서는 ETag가 일치할 때 공개 경로 하나를 한 번에 교체하고 읽어서 확인한다. 다른 발행이 먼저 완료되면 다음 실행에서 최신 데이터를 다시 대조한다. [조건부 쓰기](https://firebase.google.com/docs/database/rest/save-data#section-conditional-requests)
 
-Firebase Authentication에서 발행에 사용할 익명 인증을 활성화한 뒤 `scripts/sync-firebase-catalog.ps1 -InitializePublisher`를 발행 Windows 계정에서 한 번 실행한다. 반환된 UID만 `/onsen_public/v1`에 `auth != null && auth.uid === '<UID>' && newData.isString()` 조건으로 쓰기 허용한다. 발행 세션은 해당 Windows 계정의 DPAPI로 보호하며 `.wrangler/firebase-publisher`에 둔다. [Firebase 인증과 규칙](https://firebase.google.com/docs/database/security/rules-conditions)
+Firebase 이메일·비밀번호 제공업체를 활성화한 뒤 `scripts/sync-firebase-catalog.ps1 -InitializePublisher`를 발행 Windows 계정에서 한 번 실행한다. 발행자가 반환한 UID에 대해 프로젝트 운영자가 `/authorization/publishers/<UID>`를 `true`로 등록한다. 이 발행자는 `/onsen_public/v1`에만 쓸 수 있다. 발행 세션은 해당 Windows 계정의 DPAPI로 보호하며 `.wrangler/firebase-publisher`에 둔다. [Firebase 인증과 규칙](https://firebase.google.com/docs/database/security/rules-conditions)
 
 ```powershell
 ./scripts/sync-firebase-catalog.ps1
@@ -46,6 +46,12 @@ node scripts/export-firebase-catalog.mjs http://127.0.0.1:55450 .wrangler/onsen-
 ```
 
 Firebase 콘솔에서 `/onsen_public`으로 이동해 내보낸 파일의 `onsen_public` 객체를 가져온다. 루트 가져오기는 빈 DB를 초기화할 때 사용한다. 공개 경로의 릴리스 ID와 항목 수를 Cloudflare 목록 및 API와 대조한다.
+
+## 회원 계정과 콘텐츠 관리
+
+`/ko/onsen/account`는 Firebase 이메일·비밀번호 인증을 사용한다. 이름과 전화번호는 `/profiles/<UID>`에 두며, 일반 회원은 본인 기록에만 접근한다. `/ko/onsen/admin`에서 콘텐츠 초안을 만들고 수정한다. 공개로 저장한 글은 언어별 `/ko/onsen/news`에 나타난다. 게시글과 온천 카탈로그는 별도 발행 흐름을 사용한다.
+
+Firebase 프로젝트 운영자가 `.env.local`의 `ONSEN_ADMIN_UID`를 Firebase Auth 사용자와 대조한 뒤 `/authorization/admins/<UID>`를 `true`로 설정한다. 관리자 계정은 계정 화면에서 이메일을 인증하며, Firebase 규칙에서 등록된 UID와 이메일 인증을 함께 검증한 뒤 콘텐츠 쓰기를 허용한다. Firebase 배포에는 `firebase deploy --only database --project onsen-587dc`를 사용한다. 회원 자격 증명과 UID 설정은 로컬에서 관리한다.
 
 ## 공간 격자 조사
 

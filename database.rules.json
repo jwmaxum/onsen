@@ -2,8 +2,100 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "authorization": {
+      "admins": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
+      }
+    },
+    "profiles": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid && root.child('authorization').child('publishers').child(auth.uid).val() !== true",
+        ".write": "auth != null && auth.uid === $uid && root.child('authorization').child('publishers').child(auth.uid).val() !== true",
+        ".validate": "newData.hasChildren(['name', 'phone'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80"
+        },
+        "phone": {
+          ".validate": "newData.isString() && newData.val().matches(/^\\+?[0-9]{7,15}$/)"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
     "onsen_public": {
-      "v1": { ".read": true }
+      "v1": {
+        ".read": true,
+        ".write": "auth != null && root.child('authorization').child('publishers').child(auth.uid).val() === true && newData.isString()"
+      }
+    },
+    "site_content": {
+      ".read": "auth != null && auth.token.email_verified === true && root.child('authorization').child('admins').child(auth.uid).val() === true && root.child('authorization').child('publishers').child(auth.uid).val() !== true",
+      ".write": "auth != null && auth.token.email_verified === true && root.child('authorization').child('admins').child(auth.uid).val() === true && root.child('authorization').child('publishers').child(auth.uid).val() !== true",
+      "drafts": {
+        "$id": {
+          ".validate": "$id.matches(/^[a-zA-Z0-9_-]{1,80}$/) && newData.hasChildren(['locale', 'title', 'body', 'published', 'updatedAt', 'revision'])",
+          "locale": {
+            ".validate": "(newData.val() === 'ko' || newData.val() === 'ja' || newData.val() === 'en' || newData.val() === 'zh-Hans')"
+          },
+          "title": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+          },
+          "body": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 8000"
+          },
+          "published": {
+            ".validate": "newData.isBoolean()"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000"
+          },
+          "revision": {
+            ".validate": "newData.isString() && newData.val().matches(/^[a-zA-Z0-9_-]{1,80}$/)"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "public": {
+        ".read": true,
+        "$locale": {
+          ".validate": "$locale === 'ko' || $locale === 'ja' || $locale === 'en' || $locale === 'zh-Hans'",
+          ".indexOn": [
+            "updatedAt"
+          ],
+          "$id": {
+            ".validate": "$id.matches(/^[a-zA-Z0-9_-]{1,80}$/) && newData.hasChildren(['locale', 'title', 'body', 'published', 'updatedAt', 'revision'])",
+            "locale": {
+              ".validate": "newData.val() === $locale"
+            },
+            "title": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+            },
+            "body": {
+              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 8000"
+            },
+            "published": {
+              ".validate": "newData.val() === true"
+            },
+            "updatedAt": {
+              ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= now + 300000"
+            },
+            "revision": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-zA-Z0-9_-]{1,80}$/)"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
     }
   }
 }

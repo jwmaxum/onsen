@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { exportCatalog } from './export-firebase-catalog.mjs';
 import { firebaseCatalogPath } from '../src/lib/catalog-projection.ts';
@@ -80,7 +80,10 @@ async function createPublisher(apiKey) {
   const url = new URL('https://identitytoolkit.googleapis.com/v1/accounts:signUp');
   url.searchParams.set('key', apiKey);
   const result = await request(url, 'Publisher creation', { method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }) });
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      email: `onsen-publisher-${randomBytes(12).toString('hex')}@example.invalid`,
+      password: `Aa1!${randomBytes(24).toString('base64url')}`, returnSecureToken: true,
+    }) });
   if (!result.ok) throw new Error(`Publisher creation failed (HTTP ${result.status})`);
   const payload = await result.json();
   if (typeof payload.localId !== 'string' || typeof payload.refreshToken !== 'string') {

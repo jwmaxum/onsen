@@ -13,6 +13,8 @@
   "dependencies": {
     "@firebase/analytics": "0.10.26",
     "@firebase/app": "0.16.7",
+    "@firebase/auth": "1.13.11",
+    "@firebase/database": "1.1.6",
     "lucide-react": "^0.553.0",
     "next": "16.4.5",
     "next-intl": "4.14.9",

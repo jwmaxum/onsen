@@ -3,6 +3,7 @@ import { Waves } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { locales, type Locale } from '@/lib/catalog-query';
 import { localeLabels, text } from '@/lib/i18n';
+import { membershipText } from '@/lib/membership-copy';
 
 export function Shell({ locale, hrefFor, children }: {
   locale: Locale;
@@ -10,6 +11,7 @@ export function Shell({ locale, hrefFor, children }: {
   children: ReactNode;
 }) {
   const t = text(locale);
+  const member = membershipText(locale);
   return <>
     <header className="site-header">
       <div className="container header-inner">
@@ -17,10 +19,13 @@ export function Shell({ locale, hrefFor, children }: {
           <span className="brand-icon"><Waves size={21} aria-hidden="true" /></span>
           <span>{t('brand')}<span className="brand-caption" lang="en">ONSEN ATLAS</span></span>
         </Link>
-        <nav aria-label={t('language')} className="language-nav">
+        <div className="header-navigation"><nav aria-label={t('language')} className="language-nav">
           {locales.map((value) => <Link key={value} href={hrefFor(value)} lang={value} hrefLang={value}
             aria-current={value === locale ? 'page' : undefined}>{localeLabels[value]}</Link>)}
-        </nav>
+        </nav><div className="member-links">
+          <Link href={`/${locale}/onsen/news`}>{member('articles')}</Link>
+          <Link href={`/${locale}/onsen/account`}>{member('account')}</Link>
+        </div></div>
       </div>
     </header>
     <main id="main">{children}</main>

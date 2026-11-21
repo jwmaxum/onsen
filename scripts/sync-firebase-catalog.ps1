@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$node = (Get-Command node.exe -CommandType Application).Source
+$node = (Get-Command node.exe -CommandType Application | Select-Object -First 1).Source
 $dataDirectory = Join-Path $repoRoot '.wrangler/firebase-publisher'
 $credentialPath = Join-Path $dataDirectory 'session.xml'
 $statePath = Join-Path $dataDirectory 'state.json'
@@ -42,20 +42,33 @@ New-Item -Path $dataDirectory -ItemType Directory -Force | Out-Null
 if ($RegisterTask) {
     if (!(Test-Path -LiteralPath $credentialPath)) { throw 'Initialize the Firebase publisher first' }
     $taskName = 'Onsen Firebase Catalog Publisher'
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
-    $powershell = (Get-Command powershell.exe -CommandType Application).Source
-    $arguments = '-NoProfile -NonInteractive -WindowStyle Hidden -File "' + $PSCommandPath + '"'
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-ScheduledTaskPrincipal -UserId $identity.Name -LogonType Interactive -RunLevel Limited
+    $powershell = (Get-Command powershell.exe -CommandType Application | Select-Object -First 1).Source
+    $scriptArgument = '-WindowStyle Hidden -File "' + $PSCommandPath + '"'
+    $arguments = '-NoProfile -NonInteractive -ExecutionPolicy RemoteSigned ' + $scriptArgument
+    $action = New-ScheduledTaskAction -Execute $powershell -Argument $arguments -WorkingDirectory $repoRoot
     $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($existing) {
-        if ($existing.Actions.Execute -ne $powershell -or $existing.Actions.Arguments -ne $arguments
-            -or $existing.Actions.WorkingDirectory -ne $repoRoot -or $existing.Principal.UserId -ne $identity) {
+        $previousArguments = '-NoProfile -NonInteractive ' + $scriptArgument
+        $sameCommand = @($existing.Actions).Count -eq 1 -and $existing.Actions.Execute -eq $powershell -and
+            $existing.Actions.Arguments -in @($arguments, $previousArguments)
+        $sameDirectory = $existing.Actions.WorkingDirectory -eq $repoRoot
+        $taskUser = $existing.Principal.UserId
+        if ($taskUser -notmatch '^S-\d-') {
+            if ($taskUser -notlike '*\*') { $taskUser = "$env:COMPUTERNAME\$taskUser" }
+            $taskUser = [Security.Principal.NTAccount]::new($taskUser).Translate([Security.Principal.SecurityIdentifier]).Value
+        }
+        $sameUser = $taskUser -eq $identity.User.Value
+        if (!($sameCommand -and $sameDirectory -and $sameUser)) {
             throw 'A scheduled task with the same name is configured differently'
+        }
+        if ($existing.Actions.Arguments -eq $previousArguments) {
+            Set-ScheduledTask -TaskName $taskName -Action $action | Out-Null
         }
         Start-ScheduledTask -TaskName $taskName
         return
     }
-    $action = New-ScheduledTaskAction -Execute $powershell -Argument $arguments -WorkingDirectory $repoRoot
     $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1)
     $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Minutes 2) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Publish reviewed Onsen catalog releases to Firebase.' | Out-Null
