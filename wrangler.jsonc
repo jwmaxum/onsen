@@ -10,5 +10,8 @@
   },
   "workers_dev": true,
   "preview_urls": false,
+  "vars": {
+    "ONSEN_FIREBASE_DATABASE_URL": "https://onsen-587dc-default-rtdb.asia-southeast1.firebasedatabase.app"
+  },
   "keep_vars": true
 }

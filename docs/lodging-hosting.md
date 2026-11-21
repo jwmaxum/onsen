@@ -20,6 +20,18 @@ npm exec --yes --package=firebase-tools -- firebase hosting:channel:deploy onsen
 
 정적 화면에서 언어 전환, 목록·상세 이동, 지도, 조사 현황을 볼 수 있다. 실시간 필터·페이지 추가 및 Analytics 초기화는 로컬 Next.js 앱의 기능이다. 외부 서버에서 실시간 DB 조회를 하려면 접근 제어가 적용된 운영 데이터 API와 SSR 호스팅을 설정한다. [Firebase 미리보기 채널](https://firebase.google.com/docs/hosting/test-preview-deploy)
 
+## Cloudflare의 Firebase 카탈로그
+
+Cloudflare Worker는 `ONSEN_FIREBASE_DATABASE_URL`의 Realtime Database에서 `/onsen_public/v1.json`을 읽는다. 공개 API의 여섯 뷰를 JSON 문자열로 저장해 빈 배열과 `null`을 유지한다. Worker는 조회 결과를 최대 60초 동안 재사용한다. DB 규칙은 이 경로에 익명 읽기를 허용하고 모든 클라이언트 쓰기를 거부한다. `ONSEN_CURSOR_SECRET`은 Worker의 런타임 비밀값에 저장한다. [Firebase REST 조회](https://firebase.google.com/docs/database/rest/retrieve-data) · [Realtime Database 규칙](https://firebase.google.com/docs/database/security)
+
+공개 릴리스가 바뀌면 익명 PostgREST 주소로 새 파일을 생성한다.
+
+```powershell
+node scripts/export-firebase-catalog.mjs http://127.0.0.1:55450 .wrangler/onsen-catalog-new.json
+```
+
+Firebase 콘솔에서 `/onsen_public`으로 이동해 내보낸 파일의 `onsen_public` 객체를 가져온다. 루트 가져오기는 빈 DB를 초기화할 때 사용한다. 공개 경로의 릴리스 ID와 항목 수를 Cloudflare 목록 및 API와 대조한다.
+
 ## 공간 격자 조사
 
 200m 격자는 시정촌 내에서 조사한 구역과 미확인 구역을 표시하는 데 사용한다. 허가 원장과 지자체가 공개한 온천 시설을 우선 찾고, 좌표 사용 조건을 확인한 자료만 미터 단위 투영 좌표계에서 격자에 매핑한다. 유후인에서는 온천지 경계 또는 시설 밀집 구역에서 시작하고, 후보·근거·검수 결과를 셀 단위로 기록한다. 출처 ID와 주소로 중복을 줄이고 운영사 자료로 숙박과 자연온천을 확인한다. 행정 원장에 없는 후보는 발견 근거를 남겨 별도 검수한다.

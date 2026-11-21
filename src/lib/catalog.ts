@@ -2,18 +2,15 @@ import 'server-only';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { cache } from 'react';
 import { CatalogError, queryParams, type CatalogQuery, type Kind, type Locale } from './catalog-query';
+import { analysisColumns, coverageColumns, entryColumns, legColumns } from './catalog-projection';
+import { comparePosition, firebaseEntries, loadFirebaseCatalog, type CatalogPosition, type CatalogRelease, type FirebaseCatalog } from './firebase-catalog';
 import type { Analysis, AreaInventoryProgress, CatalogPage, CoverageRow, Entry, RouteLeg } from './catalog-types';
 
-type Release = { release_id: string; as_of: string };
-type Position = Pick<Entry, 'latitude' | 'longitude' | 'entity_id'>;
-type Cursor = Position & { release: string; query: string };
+type Cursor = CatalogPosition & { release: string; query: string };
 
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const pilot = /^pilot-\d{4}-\d{2}-\d{2}(?:-r[1-9]\d*)?$/;
-const columns = 'release_id,entity_id,kind,prefecture_code,slug,name_ja,location_ja,latitude,longitude,facility_type,in_journey,public_source_url,verified_at,coordinate_accuracy,quality_codes,day_admission_jpy,coordinate_source_url,coordinate_attribution';
-const analysisColumns = 'analysis_id,locale,sample_name,quality_name,sample_note,sampled_on,analyzed_on,source_temp_celsius,ph_onsite,ph_laboratory,source_publisher,source_url,source_terms_url,source_license,source_accessed_on,source_modified,source_attribution,source_transformation';
-const legColumns = 'route_key,travel_mode,verified_at,valid_until,duration_minutes,fare_jpy,transfers,route_source_url,seq,mode,from_code,from_name_ja,to_code,to_name_ja,operator_name,service_name,leg_duration_minutes,leg_fare_jpy,reservation_required,leg_source_url';
 
 export function isReleaseId(value: string) {
   return uuid.test(value) || pilot.test(value);
@@ -26,7 +23,9 @@ export function isSlug(value: string) {
 type View = 'web_catalog_versions' | 'web_catalog_entries' | 'published_spring_analyses' | 'web_pilot_route_legs'
   | 'prefecture_coverage' | 'area_inventory_progress';
 
-async function read<T>(view: View, params: Record<string, string>): Promise<T[]> {
+async function read<T>(view: View, params: Record<string, string>, project: (data: FirebaseCatalog) => T[]): Promise<T[]> {
+  const firebaseOrigin = process.env.ONSEN_FIREBASE_DATABASE_URL;
+  if (firebaseOrigin) return project(await loadFirebaseCatalog(firebaseOrigin));
   let base: URL;
   try {
     base = new URL(process.env.ONSEN_POSTGREST_URL ?? '');
@@ -88,7 +87,7 @@ function encodeCursor(entry: Entry, query: CatalogQuery) {
   return `${payload}.${signature(payload).toString('base64url')}`;
 }
 
-function positionFilter(position: Position, before = false) {
+function positionFilter(position: CatalogPosition, before = false) {
   const { latitude, longitude, entity_id: id } = position;
   const coordinate = before ? 'gt' : 'lt';
   const identity = before ? 'lt' : 'gt';
@@ -99,17 +98,18 @@ const order = 'latitude.desc,longitude.desc,entity_id.asc';
 
 export function getCoverage(kind: Kind) {
   return read<CoverageRow>('prefecture_coverage', {
-    select: 'prefecture_code,name_ja,name_en,status,registered_sources,candidates,reviewed,published,withdrawn,checked_on,gap_codes',
+    select: coverageColumns,
     kind: `eq.${kind}`, order: 'prefecture_code.asc', limit: '47',
-  });
+  }, (data) => data.prefecture_coverage.filter((row) => row.kind === kind));
 }
 
 export function getAreaInventoryProgress() {
-  return read<AreaInventoryProgress>('area_inventory_progress', { order: 'prefecture_code.asc', limit: '47' });
+  return read<AreaInventoryProgress>('area_inventory_progress', { order: 'prefecture_code.asc', limit: '47' },
+    (data) => data.area_inventory_progress);
 }
 
 function selection(query: CatalogQuery, release: string) {
-  const params: Record<string, string> = { select: columns, release_id: `eq.${release}`, kind: `eq.${query.kind}` };
+  const params: Record<string, string> = { select: entryColumns, release_id: `eq.${release}`, kind: `eq.${query.kind}` };
   if (query.scope === 'journey') params.in_journey = 'eq.true';
   if (query.prefecture) params.prefecture_code = `eq.${query.prefecture}`;
   if (query.quality) params.quality_codes = `cs.{${query.quality}}`;
@@ -119,8 +119,9 @@ function selection(query: CatalogQuery, release: string) {
 
 const getRelease = cache(async (id?: string) => {
   if (id && !isReleaseId(id)) throw new CatalogError('invalid_query', 400);
-  const [release] = await read<Release>('web_catalog_versions', { select: 'release_id,as_of', limit: '1',
-    ...(id ? { release_id: `eq.${id}` } : { status: 'eq.active' }) });
+  const [release] = await read<CatalogRelease>('web_catalog_versions', { select: 'release_id,as_of', limit: '1',
+    ...(id ? { release_id: `eq.${id}` } : { status: 'eq.active' }) },
+  (data) => data.web_catalog_versions.filter((item) => id ? item.release_id === id : item.status === 'active'));
   if (!release && id) throw new CatalogError('release_expired', 409);
   return release;
 });
@@ -131,7 +132,9 @@ export async function getCatalogPage(query: CatalogQuery, releaseHint?: string):
   const release = await getRelease(cursor?.release ?? releaseHint);
   if (!release) return { items: [], nextCursor: null, releaseId: null, asOf: null };
   const rows = await read<Entry>('web_catalog_entries', { ...selection(query, release.release_id), order,
-    limit: String(query.limit + 1), ...(cursor ? { or: positionFilter(cursor) } : {}) });
+    limit: String(query.limit + 1), ...(cursor ? { or: positionFilter(cursor) } : {}) },
+  (data) => firebaseEntries(data, query, release.release_id)
+    .filter((entry) => !cursor || comparePosition(entry, cursor) > 0).slice(0, query.limit + 1));
   const items = rows.slice(0, query.limit);
   return { items, nextCursor: rows.length > query.limit ? encodeCursor(items.at(-1)!, query) : null,
     releaseId: release.release_id, asOf: release.as_of };
@@ -141,13 +144,16 @@ export const getEntry = cache(async (kind: Kind, slug: string, releaseHint?: str
   if (!isSlug(slug)) return undefined;
   const release = await getRelease(releaseHint);
   if (!release) return undefined;
-  return (await read<Entry>('web_catalog_entries', { select: columns, release_id: `eq.${release.release_id}`,
-    kind: `eq.${kind}`, slug: `eq.${slug}`, limit: '1' }))[0];
+  return (await read<Entry>('web_catalog_entries', { select: entryColumns, release_id: `eq.${release.release_id}`,
+    kind: `eq.${kind}`, slug: `eq.${slug}`, limit: '1' }, (data) => data.web_catalog_entries.filter((entry) =>
+    entry.release_id === release.release_id && entry.kind === kind && entry.slug === slug)))[0];
 });
 
 async function getAnalyses(slug: string, locale: Locale) {
   const rows = await read<Analysis>('published_spring_analyses', { select: analysisColumns, facility_slug: `eq.${slug}`,
-    locale: locale === 'ja' ? 'eq.ja' : `in.(${locale},ja)`, order: 'source_url.asc', limit: '100' });
+    locale: locale === 'ja' ? 'eq.ja' : `in.(${locale},ja)`, order: 'source_url.asc', limit: '100' },
+  (data) => data.published_spring_analyses.filter((item) => item.facility_slug === slug
+    && (item.locale === locale || item.locale === 'ja')).slice(0, 100));
   const localized = new Map<string, Analysis>();
   for (const row of rows) {
     if (row.locale === locale || !localized.has(row.analysis_id)) localized.set(row.analysis_id, row);
@@ -158,12 +164,17 @@ async function getAnalyses(slug: string, locale: Locale) {
 export async function getDetail(entry: Entry, query: CatalogQuery) {
   const filters = selection(query, entry.release_id);
   const facility = entry.kind === 'facility';
+  const todayInJapan = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const [previous, next, analyses, legs] = await Promise.all([
-    read<Entry>('web_catalog_entries', { ...filters, or: positionFilter(entry, true), order: 'latitude.asc,longitude.asc,entity_id.desc', limit: '1' }),
-    read<Entry>('web_catalog_entries', { ...filters, or: positionFilter(entry), order, limit: '1' }),
+    read<Entry>('web_catalog_entries', { ...filters, or: positionFilter(entry, true), order: 'latitude.asc,longitude.asc,entity_id.desc', limit: '1' },
+      (data) => firebaseEntries(data, query, entry.release_id).filter((item) => comparePosition(item, entry) < 0).slice(-1)),
+    read<Entry>('web_catalog_entries', { ...filters, or: positionFilter(entry), order, limit: '1' },
+      (data) => firebaseEntries(data, query, entry.release_id).filter((item) => comparePosition(item, entry) > 0).slice(0, 1)),
     facility ? getAnalyses(entry.slug, query.locale) : [],
     facility ? read<RouteLeg>('web_pilot_route_legs', { select: legColumns, facility_slug: `eq.${entry.slug}`,
-      order: 'travel_mode.desc,route_key.asc,seq.asc', limit: '30' }) : [],
+      order: 'travel_mode.desc,route_key.asc,seq.asc', limit: '30' },
+    (data) => data.web_pilot_route_legs.filter((leg) => leg.facility_slug === entry.slug
+      && (leg.valid_until === null || leg.valid_until >= todayInJapan)).slice(0, 30)) : [],
   ]);
   return { previous: previous[0], next: next[0], analyses, legs };
 }

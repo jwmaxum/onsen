@@ -1,0 +1,9 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "onsen_public": {
+      "v1": { ".read": true }
+    }
+  }
+}

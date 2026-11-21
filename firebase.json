@@ -1,4 +1,5 @@
 {
+  "database": { "rules": "database.rules.json" },
   "hosting": {
     "site": "onsen-587dc",
     "public": ".firebase-preview",
