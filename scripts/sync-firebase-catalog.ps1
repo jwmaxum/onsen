@@ -5,7 +5,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$PSNativeCommandUseErrorActionPreference = $false
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $node = (Get-Command node.exe -CommandType Application | Select-Object -First 1).Source
 $dataDirectory = Join-Path $repoRoot '.wrangler/firebase-publisher'
@@ -93,8 +92,30 @@ try {
         if (Test-Path -LiteralPath $statePath) { $request.state = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json }
     }
 
-    $responseText = ($request | ConvertTo-Json -Depth 10 -Compress) | & $node (Join-Path $PSScriptRoot 'sync-firebase-catalog.mjs') --windows-publisher-pipe
-    $exitCode = $LASTEXITCODE
+    $launch = [Diagnostics.ProcessStartInfo]::new($node)
+    $launch.Arguments = '"' + (Join-Path $PSScriptRoot 'sync-firebase-catalog.mjs') + '" --windows-publisher-pipe'
+    $launch.UseShellExecute = $false
+    $launch.CreateNoWindow = $true
+    $launch.RedirectStandardInput = $true
+    $launch.RedirectStandardOutput = $true
+    $launch.RedirectStandardError = $true
+    $publisher = [Diagnostics.Process]::Start($launch)
+    try {
+        $response = $publisher.StandardOutput.ReadToEndAsync()
+        $diagnostics = $publisher.StandardError.ReadToEndAsync()
+        $publisher.StandardInput.Write(($request | ConvertTo-Json -Depth 10 -Compress))
+        $publisher.StandardInput.Close()
+        if (!$publisher.WaitForExit(90000)) {
+            $publisher.Kill()
+            throw 'Firebase publisher exceeded its execution time limit'
+        }
+        $exitCode = $publisher.ExitCode
+        $responseText = $response.GetAwaiter().GetResult()
+        $null = $diagnostics.GetAwaiter().GetResult()
+        if (!$responseText) { throw "Firebase publisher returned no response (exit code $exitCode)" }
+    } finally {
+        $publisher.Dispose()
+    }
     $result = $responseText | ConvertFrom-Json
     if ($result.refreshToken) {
         $uid = if ($InitializePublisher) { $result.uid } else { $request.credential.uid }
@@ -109,6 +130,11 @@ try {
     Write-AtomicJson -Path $logPath -Value $log
     $log | ConvertTo-Json -Depth 12 -Compress
     if ($exitCode -ne 0) { exit $exitCode }
+} catch {
+    if (!$InitializePublisher) {
+        Write-AtomicJson -Path $logPath -Value @{finishedAt = [DateTimeOffset]::UtcNow.ToString('o'); status = 'error'; error = 'Windows publisher could not complete the sync'}
+    }
+    throw
 } finally {
     $lock.Dispose()
 }
