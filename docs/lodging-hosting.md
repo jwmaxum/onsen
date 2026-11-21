@@ -24,7 +24,22 @@ npm exec --yes --package=firebase-tools -- firebase hosting:channel:deploy onsen
 
 Cloudflare Worker는 `ONSEN_FIREBASE_DATABASE_URL`의 Realtime Database에서 `/onsen_public/v1.json`을 읽는다. 공개 API의 여섯 뷰를 JSON 문자열로 저장해 빈 배열과 `null`을 유지한다. Worker는 조회 결과를 최대 60초 동안 재사용한다. DB 규칙은 이 경로에 익명 읽기를 허용하고 모든 클라이언트 쓰기를 거부한다. `ONSEN_CURSOR_SECRET`은 Worker의 런타임 비밀값에 저장한다. [Firebase REST 조회](https://firebase.google.com/docs/database/rest/retrieve-data) · [Realtime Database 규칙](https://firebase.google.com/docs/database/security)
 
-공개 릴리스가 바뀌면 익명 PostgREST 주소로 새 파일을 생성한다.
+### 검수 후 자동 발행
+
+검수 담당자가 원본 DB에서 릴리스를 활성화하면 Windows 발행 작업이 익명 PostgREST의 공개 뷰 여섯 개를 읽는다. 현황이나 분석이 바뀌면 같은 릴리스 ID에서도 반영한다. Firebase에서는 ETag가 일치할 때 공개 경로 하나를 한 번에 교체하고 읽어서 확인한다. 다른 발행이 먼저 완료되면 다음 실행에서 최신 데이터를 다시 대조한다. [조건부 쓰기](https://firebase.google.com/docs/database/rest/save-data#section-conditional-requests)
+
+Firebase Authentication에서 발행에 사용할 익명 인증을 활성화한 뒤 `scripts/sync-firebase-catalog.ps1 -InitializePublisher`를 발행 Windows 계정에서 한 번 실행한다. 반환된 UID만 `/onsen_public/v1`에 `auth != null && auth.uid === '<UID>' && newData.isString()` 조건으로 쓰기 허용한다. 발행 세션은 해당 Windows 계정의 DPAPI로 보호하며 `.wrangler/firebase-publisher`에 둔다. [Firebase 인증과 규칙](https://firebase.google.com/docs/database/security/rules-conditions)
+
+```powershell
+./scripts/sync-firebase-catalog.ps1
+./scripts/sync-firebase-catalog.ps1 -RegisterTask
+```
+
+첫 명령으로 쓰기 또는 변경 없음 결과를 확인한 뒤 작업을 등록한다. 작업은 같은 Windows 계정이 로그인하고 로컬 PostgREST가 실행 중일 때 매분 확인한다. `.wrangler/firebase-publisher/last-run.json`에 마지막 결과를 남긴다. Worker의 최대 60초 캐시가 만료되면 목록과 API에 반영된다. GitHub `main` 푸시는 Workers 앱 코드 배포를 시작한다.
+
+### 초기화와 수동 복구
+
+공개 데이터의 복구 파일이 필요하면 익명 PostgREST 주소로 생성한다.
 
 ```powershell
 node scripts/export-firebase-catalog.mjs http://127.0.0.1:55450 .wrangler/onsen-catalog-new.json
